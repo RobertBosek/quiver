@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function
 import json
 from flask.json import jsonify
 import numpy as np
-from keras.preprocessing import image
+import keras.utils as image
 import keras.backend as K
 from contextlib import contextmanager
 from quiver_engine.imagenet_utils import preprocess_input, decode_imagenet_predictions
@@ -24,7 +24,7 @@ def get_evaluation_context():
 def get_evaluation_context_getter():
     if K.backend() == 'tensorflow':
         import tensorflow as tf
-        return tf.get_default_graph().as_default
+        return tf.compat.v1.get_default_graph().as_default
 
     if K.backend() == 'theano':
         return contextmanager(lambda: (yield))
@@ -33,14 +33,23 @@ def get_input_config(model):
     '''
         returns a tuple (inputDimensions, numChannels)
     '''
-
+    print(K.image_data_format())
+    print(model.get_layer(index=0).get_config())
+    print((
+        model.get_layer(index=0).get_config()["batch_input_shape"][1:3],
+        model.get_layer(index=0).get_config()["batch_input_shape"][3]
+    ))
     return (
-        model.get_input_shape_at(0)[2:4],
-        model.get_input_shape_at(0)[1]
+        model.get_layer(index=0).get_config()["batch_input_shape"][1:3],
+        model.get_layer(index=0).get_config()["batch_input_shape"][3]
+    )
+    return (
+        model.get_layer(index=0).get_config()["batch_input_shape"][0:3],
+        model.get_layer(index=0).get_config()["batch_input_shape"][3]
     ) if K.image_data_format() == 'th' else (
         #tf ordering
-        model.get_input_shape_at(0)[1:3],
-        model.get_input_shape_at(0)[3]
+	    model.get_layer(index=0).get_config()["batch_input_shape"][0:3],
+        model.get_layer(index=0).get_config()["batch_input_shape"][3]
     )
 
 def decode_predictions(preds, classes, top):
@@ -79,6 +88,7 @@ def load_img_scaled(input_path, target_shape, grayscale=False):
     )
 
 def load_img(input_path, target_shape, grayscale=False, mean=None, std=None):
+    print(input_path, target_shape)
     img = image.load_img(input_path, target_size=target_shape,
                          grayscale=grayscale)
     img_arr = np.expand_dims(image.img_to_array(img), axis=0)
